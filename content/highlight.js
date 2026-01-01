@@ -1,3 +1,26 @@
+
+ // Helper functions
+ 
+
+// Check if selection is already inside a <mark>
+function isInsideHighlight(node) {
+  while (node) {
+    if (node.nodeType === 1 && node.tagName === "MARK") return true;
+    node = node.parentNode;
+  }
+  return false;
+}
+
+// Check if the same text on the same URL is already saved
+async function isDuplicate(text, url) {
+  const result = await chrome.storage.local.get("highlights");
+  const highlights = result.highlights || [];
+  return highlights.some(h => h.text === text && h.url === url);
+}
+
+
+// Restore highlights on page load
+
 async function restoreHighlights() {
   const result = await chrome.storage.local.get("highlights");
   const highlights = result.highlights || [];
@@ -15,8 +38,13 @@ async function restoreHighlights() {
       }
     });
 }
+
+// Restore when page loads
 restoreHighlights();
 
+//
+ //Create new highlight
+//
 document.addEventListener("mouseup", async () => {
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed) return;
@@ -25,6 +53,19 @@ document.addEventListener("mouseup", async () => {
   if (!text) return;
 
   const range = selection.getRangeAt(0);
+
+  // Ignore clicks inside an existing highlight
+  if (isInsideHighlight(range.startContainer)) {
+    selection.removeAllRanges();
+    return;
+  }
+
+  // Prevent duplicate highlights
+  if (await isDuplicate(text, location.href)) {
+    selection.removeAllRanges();
+    return;
+  }
+
   const mark = document.createElement("mark");
   mark.style.backgroundColor = "yellow";
 
