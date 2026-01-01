@@ -90,3 +90,16 @@ document.addEventListener("mouseup", async () => {
 
   await chrome.storage.local.set({ highlights });
 });
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === "SCROLL_TO_TEXT") {
+    const marks = document.querySelectorAll("mark");
+    for (const mark of marks) {
+      if (mark.innerText === message.text) {
+        mark.scrollIntoView({ behavior: "smooth", block: "center" });
+        mark.style.outline = "2px solid orange";
+        setTimeout(() => (mark.style.outline = ""), 1500);
+        break;
+      }
+    }
+  }
+});
