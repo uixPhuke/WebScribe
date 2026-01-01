@@ -106,6 +106,16 @@ chrome.runtime.onMessage.addListener((message) => {
     }
   }
 }
+if (message.type === "DELETE_HIGHLIGHT") {
+  const marks = document.querySelectorAll("mark");
+
+  marks.forEach(mark => {
+    if (mark.innerText === message.text) {
+      const textNode = document.createTextNode(mark.innerText);
+      mark.replaceWith(textNode);
+    }
+  });
+}
 
 
   if (message.type === "SCROLL_TO_TEXT") {

@@ -15,8 +15,14 @@ chrome.storage.local.get("highlights", result => {
     const textDiv = document.createElement("div");
     textDiv.className = "text";
     textDiv.textContent = h.text;
+//delete operation
+    const deleteBtn = document.createElement("button");
+deleteBtn.textContent = "🗑️";
+deleteBtn.style.border = "none";
+deleteBtn.style.background = "transparent";
+deleteBtn.style.cursor = "pointer";
+deleteBtn.style.float = "right";
 
-    
 
     textDiv.addEventListener("click", () => {
       chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
@@ -85,6 +91,26 @@ chrome.storage.local.get("highlights", result => {
       });
     });
 
+    //delete
+deleteBtn.addEventListener("click", () => {
+  chrome.storage.local.get("highlights", res => {
+    const all = res.highlights || [];
+    const updated = all.filter(x => x.id !== h.id);
+
+    chrome.storage.local.set({ highlights: updated }, () => {
+      chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          type: "DELETE_HIGHLIGHT",
+          text: h.text
+        });
+      });
+
+      container.remove(); // remove from sidebar instantly
+    });
+  });
+});
+
+    container.appendChild(deleteBtn);
     container.appendChild(textDiv);
     container.appendChild(colors);     
     container.appendChild(textarea);
