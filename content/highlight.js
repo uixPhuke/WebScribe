@@ -1,6 +1,5 @@
 
- // Helper functions
- 
+ let currentColor = "#fde047"; 
 
 // Check if selection is already inside a <mark>
 function isInsideHighlight(node) {
@@ -33,7 +32,8 @@ async function restoreHighlights() {
       if (bodyHTML.includes(h.text)) {
         document.body.innerHTML = bodyHTML.replace(
           h.text,
-          `<mark style="background: yellow">${h.text}</mark>`
+         `<mark style="background: ${h.color || "#fde047"}">${h.text}</mark>`
+
         );
       }
     });
@@ -66,8 +66,9 @@ document.addEventListener("mouseup", async () => {
     return;
   }
 
-  const mark = document.createElement("mark");
-  mark.style.backgroundColor = "yellow";
+const mark = document.createElement("mark");
+mark.style.backgroundColor = currentColor;
+
 
   try {
     range.surroundContents(mark);
@@ -81,7 +82,8 @@ document.addEventListener("mouseup", async () => {
   text,
   url: location.href,
   createdAt: Date.now(),
-  note: ""
+  note: "",
+  color: currentColor
 };
 
 
@@ -93,6 +95,19 @@ document.addEventListener("mouseup", async () => {
   await chrome.storage.local.set({ highlights });
 });
 chrome.runtime.onMessage.addListener((message) => {
+   if (message.type === "UPDATE_COLOR") {
+  currentColor = message.color; 
+
+  const marks = document.querySelectorAll("mark");
+  for (const mark of marks) {
+    if (mark.innerText === message.text) {
+      mark.style.backgroundColor = message.color;
+      break;
+    }
+  }
+}
+
+
   if (message.type === "SCROLL_TO_TEXT") {
     const marks = document.querySelectorAll("mark");
     for (const mark of marks) {
