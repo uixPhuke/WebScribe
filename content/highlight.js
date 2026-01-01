@@ -77,11 +77,13 @@ document.addEventListener("mouseup", async () => {
   }
 
   const highlight = {
-    id: crypto.randomUUID(),
-    text,
-    url: location.href,
-    createdAt: Date.now()
-  };
+  id: crypto.randomUUID(),
+  text,
+  url: location.href,
+  createdAt: Date.now(),
+  note: ""
+};
+
 
   const result = await chrome.storage.local.get("highlights");
   const highlights = result.highlights || [];
