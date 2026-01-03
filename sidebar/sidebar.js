@@ -1,5 +1,8 @@
 const list = document.getElementById("list");
 const searchInput = document.getElementById("search");
+const exportBtn = document.getElementById("exportDocx");
+let SELECTED = new Set();
+
 
 let ALL_HIGHLIGHTS = [];
 
@@ -26,7 +29,17 @@ function renderHighlights(highlights) {
     container.className = "highlight";
     container.style.backgroundColor = h.color || "#fde047";
 
+//check
+    const checkbox = document.createElement("input");
+checkbox.type = "checkbox";
+checkbox.style.marginRight = "6px";
+
+checkbox.addEventListener("change", () => {
+  checkbox.checked ? SELECTED.add(h.id) : SELECTED.delete(h.id);
+});
+
     /******** Text ********/
+
     const textDiv = document.createElement("div");
     textDiv.className = "text";
     textDiv.textContent = h.text;
@@ -165,6 +178,7 @@ function renderHighlights(highlights) {
     });
 
     /******** Append ********/
+    container.appendChild(checkbox);
     container.appendChild(copyBtn);
     container.appendChild(deleteBtn);
     container.appendChild(textDiv);
@@ -198,4 +212,69 @@ function styleIcon(btn) {
   btn.style.background = "transparent";
   btn.style.cursor = "pointer";
   btn.style.marginRight = "6px";
+}
+
+
+//export logic
+exportBtn.addEventListener("click", () => {
+  const selected = ALL_HIGHLIGHTS.filter(h => SELECTED.has(h.id));
+
+  if (!selected.length) {
+    alert("Select at least one highlight");
+    return;
+  }
+
+  const html = `
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: Arial; }
+        h2 { margin-bottom: 4px; }
+        p { margin: 6px 0; }
+        .note { color: #555; font-style: italic; }
+        hr { margin: 12px 0; }
+      </style>
+    </head>
+    <body>
+      ${selected
+        .map(
+          h => `
+          <h2>${escapeHtml(h.text)}</h2>
+          ${h.note ? `<p class="note">Note: ${escapeHtml(h.note)}</p>` : ""}
+          <p>Source: ${h.url}</p>
+          <hr/>
+        `
+        )
+        .join("")}
+    </body>
+    </html>
+  `;
+
+  const blob = new Blob(
+    [
+      `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office"
+            xmlns:w="urn:schemas-microsoft-com:office:word"
+            xmlns="http://www.w3.org/TR/REC-html40">
+      ${html}
+      </html>
+      `
+    ],
+    { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }
+  );
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "WebScribe-Highlights.docx";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
