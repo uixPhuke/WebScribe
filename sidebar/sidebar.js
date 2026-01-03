@@ -25,13 +25,36 @@ deleteBtn.style.float = "right";
 
 
     textDiv.addEventListener("click", () => {
-      chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-        chrome.tabs.sendMessage(tabs[0].id, {
+  chrome.tabs.query({}, tabs => {
+    const existingTab = tabs.find(t => t.url === h.url);
+
+    if (existingTab) {
+      // Switch to existing tab
+      chrome.tabs.update(existingTab.id, { active: true }, () => {
+        chrome.tabs.sendMessage(existingTab.id, {
           type: "SCROLL_TO_TEXT",
           text: h.text
         });
       });
-    });
+    } else {
+      // Open new tab and scroll after load
+      chrome.tabs.create({ url: h.url }, tab => {
+        const listener = (tabId, info) => {
+          if (tabId === tab.id && info.status === "complete") {
+            chrome.tabs.sendMessage(tab.id, {
+              type: "SCROLL_TO_TEXT",
+              text: h.text
+            });
+            chrome.tabs.onUpdated.removeListener(listener);
+          }
+        };
+
+        chrome.tabs.onUpdated.addListener(listener);
+      });
+    }
+  });
+});
+
 
     // Color picker
     const colors = document.createElement("div");
