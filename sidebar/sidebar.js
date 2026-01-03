@@ -11,6 +11,8 @@ chrome.storage.local.get("highlights", result => {
   highlights.forEach(h => {
     const container = document.createElement("div");
     container.className = "highlight";
+    container.style.backgroundColor = h.color || "#fde047";
+
 
     const textDiv = document.createElement("div");
     textDiv.className = "text";
@@ -23,6 +25,28 @@ deleteBtn.style.background = "transparent";
 deleteBtn.style.cursor = "pointer";
 deleteBtn.style.float = "right";
 
+//copy option
+const copyBtn = document.createElement("button");
+copyBtn.textContent = "📋";
+copyBtn.style.border = "none";
+copyBtn.style.background = "transparent";
+copyBtn.style.cursor = "pointer";
+copyBtn.style.marginRight = "6px";
+
+//func copy
+
+copyBtn.addEventListener("click", async () => {
+  const content = [
+    `"${h.text}"`,
+    h.note ? `\nNote: ${h.note}` : "",
+    `\nSource: ${h.url}`
+  ].join("");
+
+  await navigator.clipboard.writeText(content);
+
+  copyBtn.textContent = "✅";
+  setTimeout(() => (copyBtn.textContent = "📋"), 800);
+});
 
     textDiv.addEventListener("click", () => {
   chrome.tabs.query({}, tabs => {
@@ -133,10 +157,11 @@ deleteBtn.addEventListener("click", () => {
   });
 });
 
-    container.appendChild(deleteBtn);
-    container.appendChild(textDiv);
-    container.appendChild(colors);     
-    container.appendChild(textarea);
+    container.appendChild(copyBtn);
+container.appendChild(deleteBtn);
+container.appendChild(textDiv);
+container.appendChild(colors);
+container.appendChild(textarea);
     list.appendChild(container);
   });
 });
