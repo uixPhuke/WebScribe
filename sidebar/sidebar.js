@@ -1,10 +1,23 @@
 const list = document.getElementById("list");
+const searchInput = document.getElementById("search");
 
+let ALL_HIGHLIGHTS = [];
+
+/*
+ * Load highlights
+*/
 chrome.storage.local.get("highlights", result => {
-  const highlights = result.highlights || [];
+  ALL_HIGHLIGHTS = result.highlights || [];
+  renderHighlights(ALL_HIGHLIGHTS);
+});
+
+/* Render highlights
+*/
+function renderHighlights(highlights) {
+  list.innerHTML = "";
 
   if (!highlights.length) {
-    list.innerHTML = `<div class="empty">No highlights yet</div>`;
+    list.innerHTML = `<div class="empty">No highlights found</div>`;
     return;
   }
 
@@ -13,90 +26,96 @@ chrome.storage.local.get("highlights", result => {
     container.className = "highlight";
     container.style.backgroundColor = h.color || "#fde047";
 
-
+    /******** Text ********/
     const textDiv = document.createElement("div");
     textDiv.className = "text";
     textDiv.textContent = h.text;
-//delete operation
-    const deleteBtn = document.createElement("button");
-deleteBtn.textContent = "🗑️";
-deleteBtn.style.border = "none";
-deleteBtn.style.background = "transparent";
-deleteBtn.style.cursor = "pointer";
-deleteBtn.style.float = "right";
-
-//copy option
-const copyBtn = document.createElement("button");
-copyBtn.textContent = "📋";
-copyBtn.style.border = "none";
-copyBtn.style.background = "transparent";
-copyBtn.style.cursor = "pointer";
-copyBtn.style.marginRight = "6px";
-
-//func copy
-
-copyBtn.addEventListener("click", async () => {
-  const content = [
-    `"${h.text}"`,
-    h.note ? `\nNote: ${h.note}` : "",
-    `\nSource: ${h.url}`
-  ].join("");
-
-  await navigator.clipboard.writeText(content);
-
-  copyBtn.textContent = "✅";
-  setTimeout(() => (copyBtn.textContent = "📋"), 800);
-});
 
     textDiv.addEventListener("click", () => {
-  chrome.tabs.query({}, tabs => {
-    const existingTab = tabs.find(t => t.url === h.url);
+      chrome.tabs.query({}, tabs => {
+        const existingTab = tabs.find(t => t.url === h.url);
 
-    if (existingTab) {
-      // Switch to existing tab
-      chrome.tabs.update(existingTab.id, { active: true }, () => {
-        chrome.tabs.sendMessage(existingTab.id, {
-          type: "SCROLL_TO_TEXT",
-          text: h.text
-        });
-      });
-    } else {
-      // Open new tab and scroll after load
-      chrome.tabs.create({ url: h.url }, tab => {
-        const listener = (tabId, info) => {
-          if (tabId === tab.id && info.status === "complete") {
-            chrome.tabs.sendMessage(tab.id, {
+        if (existingTab) {
+          chrome.tabs.update(existingTab.id, { active: true }, () => {
+            chrome.tabs.sendMessage(existingTab.id, {
               type: "SCROLL_TO_TEXT",
               text: h.text
             });
-            chrome.tabs.onUpdated.removeListener(listener);
-          }
-        };
-
-        chrome.tabs.onUpdated.addListener(listener);
+          });
+        } else {
+          chrome.tabs.create({ url: h.url }, tab => {
+            const listener = (tabId, info) => {
+              if (tabId === tab.id && info.status === "complete") {
+                chrome.tabs.sendMessage(tab.id, {
+                  type: "SCROLL_TO_TEXT",
+                  text: h.text
+                });
+                chrome.tabs.onUpdated.removeListener(listener);
+              }
+            };
+            chrome.tabs.onUpdated.addListener(listener);
+          });
+        }
       });
-    }
-  });
-});
+    });
 
+    /******** Copy ********/
+    const copyBtn = document.createElement("button");
+    copyBtn.textContent = "📋";
+    styleIcon(copyBtn);
 
-    // Color picker
+    copyBtn.addEventListener("click", async () => {
+      const content =
+        `"${h.text}"\n` +
+        (h.note ? `Note: ${h.note}\n` : "") +
+        `Source: ${h.url}`;
+
+      await navigator.clipboard.writeText(content);
+      copyBtn.textContent = "✅";
+      setTimeout(() => (copyBtn.textContent = "📋"), 800);
+    });
+
+    /******** Delete ********/
+    const deleteBtn = document.createElement("button");
+    deleteBtn.textContent = "🗑️";
+    styleIcon(deleteBtn);
+
+    deleteBtn.addEventListener("click", () => {
+      chrome.storage.local.get("highlights", res => {
+        const updated = (res.highlights || []).filter(x => x.id !== h.id);
+
+        chrome.storage.local.set({ highlights: updated }, () => {
+          chrome.tabs.query({}, tabs => {
+            const tab = tabs.find(t => t.url === h.url);
+            if (tab) {
+              chrome.tabs.sendMessage(tab.id, {
+                type: "DELETE_HIGHLIGHT",
+                text: h.text
+              });
+            }
+          });
+
+          ALL_HIGHLIGHTS = updated;
+          renderHighlights(updated);
+        });
+      });
+    });
+
+    /******** Color picker ********/
     const colors = document.createElement("div");
     colors.className = "colors";
 
     [
-  "#fde047", // yellow
-  "#86efac", // green
-  "#93c5fd", // blue
-  "#f9a8d4", // pink
-  "#c4b5fd"  // purple
-].forEach(c => {
-
+      "#fde047", // yellow
+      "#86efac", // green
+      "#93c5fd", // blue
+      "#f9a8d4", // pink
+      "#c4b5fd"  // purple
+    ].forEach(c => {
       const dot = document.createElement("div");
       dot.className = "color";
       dot.style.backgroundColor = c;
       dot.title = c;
-
 
       dot.addEventListener("click", () => {
         chrome.storage.local.get("highlights", res => {
@@ -107,13 +126,19 @@ copyBtn.addEventListener("click", async () => {
             all[index].color = c;
 
             chrome.storage.local.set({ highlights: all }, () => {
-              chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-                chrome.tabs.sendMessage(tabs[0].id, {
-                  type: "UPDATE_COLOR",
-                  text: h.text,
-                  color: c
-                });
+              chrome.tabs.query({}, tabs => {
+                const tab = tabs.find(t => t.url === h.url);
+                if (tab) {
+                  chrome.tabs.sendMessage(tab.id, {
+                    type: "UPDATE_COLOR",
+                    text: h.text,
+                    color: c
+                  });
+                }
               });
+
+              ALL_HIGHLIGHTS = all;
+              renderHighlights(all);
             });
           }
         });
@@ -122,6 +147,7 @@ copyBtn.addEventListener("click", async () => {
       colors.appendChild(dot);
     });
 
+    /******** Notes ********/
     const textarea = document.createElement("textarea");
     textarea.placeholder = "Add a note…";
     textarea.value = h.note || "";
@@ -138,30 +164,38 @@ copyBtn.addEventListener("click", async () => {
       });
     });
 
-    //delete
-deleteBtn.addEventListener("click", () => {
-  chrome.storage.local.get("highlights", res => {
-    const all = res.highlights || [];
-    const updated = all.filter(x => x.id !== h.id);
-
-    chrome.storage.local.set({ highlights: updated }, () => {
-      chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          type: "DELETE_HIGHLIGHT",
-          text: h.text
-        });
-      });
-
-      container.remove(); // remove from sidebar instantly
-    });
-  });
-});
-
+    /******** Append ********/
     container.appendChild(copyBtn);
-container.appendChild(deleteBtn);
-container.appendChild(textDiv);
-container.appendChild(colors);
-container.appendChild(textarea);
+    container.appendChild(deleteBtn);
+    container.appendChild(textDiv);
+    container.appendChild(colors);
+    container.appendChild(textarea);
+
     list.appendChild(container);
   });
+}
+
+/*
+ * Search
+*/
+searchInput.addEventListener("input", e => {
+  const q = e.target.value.toLowerCase();
+
+  const filtered = ALL_HIGHLIGHTS.filter(h =>
+    h.text.toLowerCase().includes(q) ||
+    (h.note && h.note.toLowerCase().includes(q)) ||
+    h.url.toLowerCase().includes(q)
+  );
+
+  renderHighlights(filtered);
 });
+
+/*
+ * Helpers
+*/
+function styleIcon(btn) {
+  btn.style.border = "none";
+  btn.style.background = "transparent";
+  btn.style.cursor = "pointer";
+  btn.style.marginRight = "6px";
+}
